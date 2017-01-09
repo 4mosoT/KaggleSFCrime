@@ -1,0 +1,109 @@
+library(plyr)
+library(dplyr)
+library(ggmap)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(caret)
+library(knitr)
+library(stringr)
+
+library(doMC)
+registerDoMC(cores = 3)
+
+train <- read_csv("./input/train.csv.zip")
+#test <- read_csv("./input/train.csv.zip")
+
+train$Resolution <- NULL
+train$Descript <- NULL
+
+options(dplyr.width = Inf)
+kable(head(train))
+summary(train)
+
+sort(table(train$Category), decreasing = TRUE)
+
+train <- mutate(train,
+                Year = factor(year(Dates), levels = 2003:2015), 
+                Month = factor(month(Dates), levels = 1:12), 
+                Day = factor(day(Dates), levels = 1:31),
+                Hour = factor(hour(Dates), levels = 0:23),
+                DayOfWeek = factor(DayOfWeek, levels=c("Monday",
+                                                       "Tuesday",
+                                                       "Wednesday",
+                                                       "Thursday",
+                                                       "Friday",
+                                                       "Saturday",
+                                                       "Sunday"))
+)
+train$Dates <- NULL
+
+# test <- mutate(test,
+#                 Year = factor(year(Dates), levels = 2003:2015), 
+#                 Month = factor(month(Dates), levels = 1:12), 
+#                 Day = factor(day(Dates), levels = 1:31),
+#                 Hour = factor(hour(Dates), levels = 0:23),
+#                 DayOfWeek = factor(DayOfWeek, levels=c("Monday",
+#                                                   "Tuesday",
+#                                                   "Wednesday",
+#                                                   "Thursday",
+#                                                   "Friday",
+#                                                   "Saturday",
+#                                                   "Sunday"))
+#                 )
+# test$Dates <- NULL
+
+
+
+
+
+train$ShortAddr <- word(train$Address, start=-2, end=-1)
+#test$ShortAddr <- word(test$Address, start=-2, end=-1)
+#train$Address <- NULL
+
+
+kable(head(train[,-6:-1]))
+
+
+dummies <- dummyVars( ~ Hour + DayOfWeek, data = train)
+dummy_train <- data.frame(predict(dummies, newdata= train))
+dummy_train$Category <- train$Category
+dummy_train$X <- train$X
+dummy_train$Y <- train$Y
+train <- dummy_train
+
+
+#Construcción del modelo
+
+train$Category <- make.names(train$Category)
+
+train_partition <- createDataPartition(y=train$Category, p=.1, list=FALSE)
+training <- train[train_partition,]
+
+ctrl <- trainControl(method = "repeatedcv",number=5, repeats=3,classProbs=TRUE, summaryFunction=mnLogLoss)
+formula <- Category ~ .
+
+model_c50 <- train (formula, tuneLength=10, data=training,method='C5.0',trControl=ctrl, metric="logLoss", verbose = TRUE)
+model_c50
+plot(model_c50)
+
+model_knn <- train (formula, tuneLength=10, data=training,method='kknn',trControl=ctrl, metric="logLoss", verbose = TRUE)
+model_knn
+plot(model_knn)
+
+model_adaboost <- train (formula, tuneLength=10, data=training,method='AdaBoost.M1',trControl=ctrl, metric="logLoss", verbose = TRUE)
+model_adaboost
+plot(model_adaboost)
+
+model_rf <- train (formula, tuneLength=10, data=training,method='rf',trControl=ctrl, metric="logLoss", verbose = TRUE)
+model_rf
+plot(model_rf)
+
+
+
+
+
+results <- resamples(list(KNN=model_knn, ModelC50 = model_c50 ))
+summary(results)
+bwplot(results)
+dotplot(results)
