@@ -8,8 +8,8 @@ library(caret)
 library(knitr)
 library(stringr)
 
-library(doMC)
-registerDoMC(cores = 3)
+#library(doMC)
+#registerDoMC(cores = 3)
 
 train <- read_csv("./input/train.csv.zip")
 #test <- read_csv("./input/train.csv.zip")
@@ -77,13 +77,15 @@ train <- dummy_train
 
 train$Category <- make.names(train$Category)
 
-train_partition <- createDataPartition(y=train$Category, p=.1, list=FALSE)
+train_partition <- createDataPartition(y=train$Category, p=.01, 
+list=FALSE)
 training <- train[train_partition,]
 
 ctrl <- trainControl(method = "repeatedcv",number=5, repeats=3,classProbs=TRUE, summaryFunction=mnLogLoss)
 formula <- Category ~ .
 
-model_c50 <- train (formula, tuneLength=10, data=training,method='C5.0',trControl=ctrl, metric="logLoss", verbose = TRUE)
+model_c50 <- train (formula, tuneLength=10, 
+data=training,method='C5.0',trControl=ctrl, metric="logLoss", verbose = TRUE)
 model_c50
 plot(model_c50)
 
