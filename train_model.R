@@ -4,7 +4,9 @@ library(caret)
 
 
 load("crime_training.Rdata")
-head(training)
+print(head(training))
+print(nrow(training))
+
 
 ctrl <- trainControl(method = "repeatedcv",number=5, repeats=3,classProbs=TRUE, summaryFunction=mnLogLoss)
 formula <- Category ~ .
@@ -15,8 +17,9 @@ formula <- Category ~ .
 
 knngrid <- expand.grid(kmax=c(3,5,7,9,15,20), distance=c(1,2), kernel=c('gaussian', 'optimal', 'inv'))
 model_knn <- train (formula, tuneGrid = knngrid, data=training,method='kknn',trControl=ctrl, metric="logLoss", verbose = TRUE)
-model_knn
+print(model_knn)
 plot(model_knn)
+save(model_knn, f="models/model_knn.Rdata")
 
 # model_adaboost <- train (formula, tuneLength=10, data=training,method='AdaBoost.M1',trControl=ctrl, metric="logLoss", verbose = TRUE)
 # model_adaboost
