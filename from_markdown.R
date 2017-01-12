@@ -76,9 +76,10 @@ train <- dummy_train
 
 train$Category <- make.names(train$Category)
 
-train_partition <- createDataPartition(y=train$Category, p=.01, 
+train_partition <- createDataPartition(y=train$Category, p=.1, 
 list=FALSE)
 training <- train[train_partition,]
+testing <- train[-train_partition,]
 save(training, file='crime_training.Rdata' )
-
+save(testing, file='crime_testing.Rdata')
 
