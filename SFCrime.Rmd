@@ -78,7 +78,7 @@ train$Dates <- NULL
 
 
 Acortamos los nombres de las calles, así solo nos quedamos con el nombre de la calle, no el número de bloque, casa, etc...:
-```{r, eval=TRUE}
+```{r}
 train$ShortAddr <- word(train$Address, start=-2, end=-1)
 kable(head(train[,-6:-1]))
 ```
@@ -128,6 +128,9 @@ rm(dummy_train)
 
 ```{r, echo = FALSE}
 load('models/model_c50.Rdata')
+load('models/model_knn.Rdata')
+load('models/model_rf.Rdata')
+
 
 ```
 
@@ -135,41 +138,82 @@ load('models/model_c50.Rdata')
 
 #Construcción del modelo
 
+Se han escogido los siguientes algoritmos de clasificación: Knn, C5.0 y random forest.
+
+* Knn: El algoritmo de "K vecinos cercanos"" se basa en calcular la distancia entre vectores dados, uno es el elemento a clasificar y los otro K, los vecinos más cercanos. 
+* C5.0: Es una modificación del árbol de decisión C4.5. Algunas de las mejoras es la velocidad y el uso mas eficiente de memoria, asi como obtener árboles de decisión más pequeños. C4.5 construye un árbol de decisión, usando el concepto de entropía de información.
+* Random Forest: Es un algoritmo de bagging, en el que se promedian varios árboles de decisión y se van escogiendo distintos atributos al azar para obetener la clasificación final.
+
+
 ```{r, eval = FALSE}
 train$Category <- make.names(train$Category)
 
-train_partition <- createDataPartition(y=train$Category, p=.001, list=FALSE)
+train_partition <- createDataPartition(y=train$Category, p=.1, list=FALSE)
 training <- train[train_partition,]
+test <- train[-train_partition,]
 
-ctrl <- trainControl(method = "repeatedcv",number=10, classProbs=TRUE, summaryFunction=mnLogLoss)
+ctrl <- trainControl(method = "repeatedcv",number=5, repeats=3,classProbs=TRUE, summaryFunction=mnLogLoss)
 formula <- Category ~ .
+```
+Aquí simplemente dividimos la partición de datos en train y test. Para evaluar los distintos modelos vamos a usar el 10% de los datos para training por la limitaciones de hardware, ya que tenemos cerca de un millón de instancias.\newline
+En traincontrol fijamos las opciones de validación. En este caso un 5 validación cruzada con 3 repeticiones debido al alto número de instancias. \newline
+Para poder evaluar nuestro modelo en Kaggle, debemos de proporcionar las probabilidades de pertenecer a cualquier clase por eso se hace necesaria la inclusión de "classProbs=TRUE", como así también la métrica a usar que en este caso es la pérdida logarítmica.
 
-model_knn <- train (formula, tuneLength=10, data=training,method='kknn',trControl=ctrl, metric="logLoss", verbose = TRUE)
-model_knn
+
+
+
+```{r, eval = FALSE}
+
+knngrid <- expand.grid(kmax=c(3,5,7,9,15,20), distance=c(1,2), kernel=c('gaussian', 'optimal', 'inv'))
+model_knn <- train (formula, tuneGrid = knngrid, data=training,method='kknn',trControl=ctrl, 
+                    metric="logLoss", verbose = TRUE)
+
+model_rf <- train (formula, tuneLength=10, data=training,method='rf',trControl=ctrl, 
+                   metric="logLoss", verbose = TRUE)
+model_c50 <- train (formula, tuneLength=10, data=training,method='C5.0',trControl=ctrl, 
+                    metric="logLoss", verbose = TRUE)
+
+```
+En estas líneas entrenamos el modelo.\newline
+Hemos fijado los valores de tuneLength en 10, para que entrene modelos con distintos parámetros. Caret se encarga de combinar los distintos parámetros si se le puede proporcionar más de uno al algoritmo.
+Particular atención recibe knngrid, en el que nosotros ajustamos los distintos parámetros a probar para el clasificador, ya que simplemente modificando tuneLength, 'caret' no nos proporciona distintas distancias o kernels.
+ 
+ 
+```{r}
 plot(model_knn)
+```
 
-model_rf <- train (formula, tuneLength=10, data=training,method='rf',trControl=ctrl, metric="logLoss", verbose = TRUE)
-model_rf
+Observamos en las gráficas como en Knn apenas hay diferencias en las distancias usadas, 1 correspondería a la distancia euclídea y 2 a la distancia manhattan. También observamos que usando un kernel 'optimal' obetenemos la mejor pérdida logarítmica y que parece que la tendencia es que al ir aumentando el número de vecinos disminuye la pérdida.
+
+```{r}
 plot(model_rf)
-
-
-model_c50 <- train (formula, tuneLength=10, data=training,method='C5.0',trControl=ctrl, metric="logLoss", verbose = TRUE)
-model_c50
-plot(model_c50)
-
-
 ```
 
 
+Para random forest parece ser que usando 8 predictores obtenemos el modelo óptimo.
 
-```{r, eval=FALSE}
-results <- resamples(list(KNN=model_knn, ModelC50 = model_c50, RF=model_rf ))
+```{r}
+plot(model_c50)
+```
+
+En C50 con winnowing es cuando mejores predicciones obtenemos y usando un modelo tree.
+
+```{r, fig.pos = 'p', fig.show='hold', out.width='50%'}
+results <- resamples(list(KNN=model_knn,RF=model_rf, C50=model_c50))
 summary(results)
 bwplot(results)
 dotplot(results)
 ```
 
 
+
+```{r}
+diffs<-diff(results)
+summary(diffs)
+
+```
+
+Vemos claramente como el mejor algoritmo a usar en este caso sería C50, aunque si queremos una menor varianza deberíamos de usar Random Forest. En cualquier caso, si queremos ajustar más el resultado, habría que seguir trabajando con uno de estos dos algoritmos, descartando Knn. 
 
 
 

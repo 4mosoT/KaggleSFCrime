@@ -76,7 +76,7 @@ train <- dummy_train
 
 train$Category <- make.names(train$Category)
 
-train_partition <- createDataPartition(y=train$Category, p=.1, 
+train_partition <- createDataPartition(y=train$Category, p=.001, 
 list=FALSE)
 training <- train[train_partition,]
 testing <- train[-train_partition,]
