@@ -9,7 +9,7 @@ geometry: margin=0.5in
 knitr::opts_chunk$set(echo = TRUE)
 ```
 #Introducción
-Se ha elegido para este trabajo la competición de Kaggle de la evolución del crimen en San Fracisco, se puede acceder en el siguiente link: <https://www.kaggle.com/c/sf-crime>. Es una opción interesante ya que podemos ver y hacer gráficos sobre el mapa de San Franciso directamente como se verá a continuación.
+Se ha elegido para este trabajo la competición de Kaggle de la evolución del crimen en San Francisco, se puede acceder en el siguiente link: <https://www.kaggle.com/c/sf-crime>. Es una opción interesante ya que podemos ver y hacer gráficos sobre el mapa de San Franciso directamente como se verá a continuación.
 
 Primero cargamos las librerías necesarias:
 ```{r, message=FALSE}
@@ -23,7 +23,7 @@ library(caret)
 library(knitr)
 library(stringr)
 ```
-Tenemos opción de usar librer�a **doMC** para poder hacer multiprocesamiento cuando entrenemos los modelos:
+Tenemos opción de usar librería **doMC** para poder hacer multiprocesamiento cuando entrenemos los modelos:
 ```{r, eval=FALSE}
 library(doMC)
 registerDoMC(cores = 4)
@@ -32,7 +32,7 @@ registerDoMC(cores = 4)
 Cargamos los datos:
 ```{r}
 train <- read_csv("./input/train.csv.zip")
-#test <- read_csv("./input/train.csv.zip")
+
 
 ```
 
@@ -72,33 +72,14 @@ train <- mutate(train,
                 )
 train$Dates <- NULL
 
-# test <- mutate(test,
-#                 Year = factor(year(Dates), levels = 2003:2015), 
-#                 Month = factor(month(Dates), levels = 1:12), 
-#                 Day = factor(day(Dates), levels = 1:31),
-#                 Hour = factor(hour(Dates), levels = 0:23),
-#                 DayOfWeek = factor(DayOfWeek, levels=c("Monday",
-#                                                   "Tuesday",
-#                                                   "Wednesday",
-#                                                   "Thursday",
-#                                                   "Friday",
-#                                                   "Saturday",
-#                                                   "Sunday"))
-#                 )
-# test$Dates <- NULL
+
 
 ```
 
 
 Acortamos los nombres de las calles, así solo nos quedamos con el nombre de la calle, no el número de bloque, casa, etc...:
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 train$ShortAddr <- word(train$Address, start=-2, end=-1)
-#test$ShortAddr <- word(test$Address, start=-2, end=-1)
-#train$Address <- NULL
-
-```
-\newpage
-```{r}
 kable(head(train[,-6:-1]))
 ```
 
@@ -129,17 +110,6 @@ ggmap(map) +
 ![](sf_districts_map.png)
 
 \newpage
-```{r, eval=FALSE, message=FALSE, out.width='40%'}
-contours <- stat_density2d(
-aes(x = X, y = Y, fill = ..level.., alpha=..level..),
-size = 0.1, data = train, n=200,
-geom = "polygon")
-
-ggmap(map, extent='device', legend="topleft") + contours +
-scale_alpha_continuous(range=c(0.25,0.4), guide='none') +
-scale_fill_gradient('Violent\nCrime\nDensity')+
-ggtitle('Violent Crime in San Francisco')
-```
 
 
 ```{r}
@@ -155,9 +125,17 @@ rm(dummy_train)
 ```
 
 \newpage
+
+```{r, echo = FALSE}
+load('models/model_c50.Rdata')
+
+```
+
+
+
 #Construcción del modelo
 
-```{r}
+```{r, eval = FALSE}
 train$Category <- make.names(train$Category)
 
 train_partition <- createDataPartition(y=train$Category, p=.001, list=FALSE)
@@ -174,20 +152,17 @@ model_rf <- train (formula, tuneLength=10, data=training,method='rf',trControl=c
 model_rf
 plot(model_rf)
 
-#Con c50 falla en multiproceso
+
 model_c50 <- train (formula, tuneLength=10, data=training,method='C5.0',trControl=ctrl, metric="logLoss", verbose = TRUE)
 model_c50
 plot(model_c50)
 
-# model_nb <- train (formula, tuneLength=10, data=training,method='nb',trControl=ctrl, metric="logLoss", verbose = TRUE)
-# model_nb
-# plot(model_nb)
 
 ```
 
 
 
-```{r}
+```{r, eval=FALSE}
 results <- resamples(list(KNN=model_knn, ModelC50 = model_c50, RF=model_rf ))
 summary(results)
 bwplot(results)
